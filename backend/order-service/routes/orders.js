@@ -27,13 +27,23 @@ const statusValidation = [
     .withMessage('Invalid status value')
 ];
 
+const quantityValidation = [
+  body('quantity')
+    .isInt({ min: 1 })
+    .withMessage('Quantity must be a positive integer'),
+  body('total_price')
+    .isNumeric()
+    .isFloat({ min: 0 })
+    .withMessage('Total price must be a positive number')
+];
+
 // Protected routes (authentication required)
 router.post('/', auth, orderValidation, orderController.createOrder);
 router.get('/', auth, orderController.getAllOrders);
 router.get('/user/:userId', auth, orderController.getOrdersByUser);
 router.get('/:id', auth, orderController.getOrderById);
 router.patch('/:id/status', auth, statusValidation, orderController.updateOrderStatus);
-router.patch('/:id', auth, quantityValidation, orderController.updateOrderQuantity)
+router.patch('/:id', auth, quantityValidation, orderController.updateOrderQuantity); // Thêm mới
 router.delete('/:id', auth, orderController.deleteOrder);
 
 // Admin routes for order management
