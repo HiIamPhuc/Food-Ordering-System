@@ -328,6 +328,66 @@ const getUserOrderStats = async (req, res) => {
   }
 };
 
+// Update order quantity
+const updateOrderQuantity = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const order = await Order.findById(req.params.id);
+    
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found'
+      });
+    }
+
+    // Xác minh món ăn
+    const menuItem = await verifyMenuItem(order.menu_item_id);
+    if (!menuItem) {
+      return res.status(400).json({
+        success: false,
+        error: 'Menu item not found or unavailable'
+      });
+    }
+
+    // Kiểm tra tổng giá
+    const expectedTotal = menuItem.price * req.body.quantity;
+    if (Math.abs(expectedTotal - req.body.total_price) > 0.01) {
+      return res.status(400).json({
+        success: false,
+        error: 'Total price mismatch',
+        expected: expectedTotal,
+        received: req.body.total_price
+      });
+    }
+
+    order.quantity = req.body.quantity;
+    order.total_price = req.body.total_price;
+    order.updated_at = new Date();
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Order quantity updated successfully',
+      data: order
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update order quantity',
+      message: error.message
+    });
+  }
+};
+
 module.exports = {
   createOrder,
   getAllOrders,
@@ -338,5 +398,6 @@ module.exports = {
   getOrdersByStatus,
   bulkUpdateOrderStatus,
   getOrderStats,
-  getUserOrderStats
+  getUserOrderStats,
+  updateOrderQuantity
 };

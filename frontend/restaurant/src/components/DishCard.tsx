@@ -1,11 +1,10 @@
-
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useCart } from '@/contexts/CartContext';
 import { toast } from '@/hooks/use-toast';
 
 interface DishCardProps {
-  id: string;
+  menu_item_id: string; // Đổi từ id thành menu_item_id
   name: string;
   description: string;
   price: number;
@@ -13,15 +12,23 @@ interface DishCardProps {
   category: string;
 }
 
-const DishCard = ({ id, name, description, price, image, category }: DishCardProps) => {
+const DishCard = ({ menu_item_id, name, description, price, image, category }: DishCardProps) => {
   const { addItem } = useCart();
 
-  const handleAddToCart = () => {
-    addItem({ id, name, price, image });
-    toast({
-      title: "Added to cart!",
-      description: `${name} has been added to your cart.`,
-    });
+  const handleAddToCart = async () => {
+    try {
+      await addItem({ menu_item_id, name, price, image });
+      toast({
+        title: "Added to cart!",
+        description: `${name} has been added to your cart.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

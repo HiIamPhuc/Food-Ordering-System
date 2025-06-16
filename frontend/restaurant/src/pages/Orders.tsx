@@ -1,46 +1,163 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCart } from '@/contexts/CartContext';
 import { toast } from '@/hooks/use-toast';
+import axios from 'axios';
 
 const Orders = () => {
-  const { state, updateQuantity, removeItem, clearCart } = useCart();
+  const { state, updateQuantity, removeItem, clearCart, setCart } = useCart();
   const [orderStatus, setOrderStatus] = useState<string>('pending');
+  const [orderId, setOrderId] = useState<string | null>(null);
 
-  const handleQuantityChange = (id: string, newQuantity: number) => {
+  // Assume userId and token are stored in localStorage after login
+  const userId = localStorage.getItem('userId') || 'user123';
+  const token = localStorage.getItem('token') || '';
+
+  // API base URL
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api/orders';
+
+  // Fetch pending orders on page load
+  useEffect(() => {
+    const fetchPendingOrders = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/user/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const orders = response.data.data.filter(order => order.status === 'pending');
+        
+        // Map orders to CartItem format
+        const cartItems = await Promise.all(
+          orders.map(async (order) => {
+            // Fetch menu item details from menu service
+            const menuResponse = await axios.get(
+              `${import.meta.env.VITE_MENU_SERVICE_URL || 'http://localhost:3001'}/api/menu/${order.menu_item_id}`,
+              { headers: { Authorization: `Bearer ${token}` } }
+            );
+            const menuItem = menuResponse.data.data;
+            return {
+              id: order.id, // Order ID
+              menu_item_id: order.menu_item_id, // Menu item ID
+              name: menuItem.name,
+              price: menuItem.price,
+              image: menuItem.image,
+              quantity: order.quantity
+            };
+          })
+        );
+
+        setCart(cartItems);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Unable to load orders. Please try again.',
+          variant: 'destructive'
+        });
+      }
+    };
+
+    fetchPendingOrders();
+  }, [setCart, userId, token]);
+
+  // Track order status after placing an order
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (orderId) {
+      interval = setInterval(async () => {
+        try {
+          const response = await axios.get(`${API_URL}/${orderId}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const status = response.data.data.status;
+          setOrderStatus(status);
+          if (status === 'delivered') {
+            clearInterval(interval);
+          }
+        } catch (error) {
+          toast({
+            title: 'Error',
+            description: 'Unable to update order status.',
+            variant: 'destructive'
+          });
+        }
+      }, 2000);
+    }
+    return () => clearInterval(interval);
+  }, [orderId, token]);
+
+  const handleQuantityChange = async (id: string, newQuantity: number) => {
     if (newQuantity <= 0) {
       removeItem(id);
     } else {
-      updateQuantity(id, newQuantity);
+      try {
+        const item = state.items.find(item => item.id === id);
+        if (!item) return;
+
+        const response = await axios.patch(
+          `${API_URL}/${id}`,
+          {
+            quantity: newQuantity,
+            total_price: item.price * newQuantity
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        updateQuantity(id, newQuantity);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Unable to update quantity.',
+          variant: 'destructive'
+        });
+      }
     }
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
     if (state.items.length === 0) {
       toast({
-        title: "Cart is empty",
-        description: "Please add some items to your cart before checking out.",
-        variant: "destructive"
+        title: 'Cart is empty',
+        description: 'Please add items to your cart before checking out.',
+        variant: 'destructive'
       });
       return;
     }
-    
-    setOrderStatus('confirmed');
-    toast({
-      title: "Order placed successfully!",
-      description: `Your order total is $${state.total.toFixed(2)}. We'll prepare it right away!`,
-    });
-    
-    // Simulate order progress
-    setTimeout(() => setOrderStatus('preparing'), 2000);
-    setTimeout(() => setOrderStatus('ready'), 5000);
-    setTimeout(() => setOrderStatus('delivered'), 8000);
+
+    try {
+      // Create an order for each item
+      const orderPromises = state.items.map(item =>
+        axios.post(
+          API_URL,
+          {
+            user_id: userId,
+            menu_item_id: item.id,
+            quantity: item.quantity,
+            total_price: item.price * item.quantity
+          },
+          { headers: { Authorization: `Bearer ${token}` } }
+        )
+      );
+
+      const responses = await Promise.all(orderPromises);
+      const newOrderId = responses[0].data.data.id; // Take the first order ID to track status
+      setOrderId(newOrderId);
+
+      toast({
+        title: 'Order placed successfully!',
+        description: `Order total: $${state.total.toFixed(2)}. We'll prepare it right away!`
+      });
+
+      setOrderStatus('confirmed');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Unable to place order. Please try again.',
+        variant: 'destructive'
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -59,7 +176,7 @@ const Orders = () => {
       case 'pending': return 'Pending';
       case 'confirmed': return 'Order Confirmed';
       case 'preparing': return 'Preparing Your Order';
-      case 'ready': return 'Ready for Pickup/Delivery';
+      case 'ready': return 'Ready for Delivery';
       case 'delivered': return 'Delivered';
       default: return 'Unknown';
     }
@@ -103,8 +220,8 @@ const Orders = () => {
                 <p className="text-sm text-gray-600 mt-2">
                   {orderStatus === 'pending' && "Your order is pending confirmation."}
                   {orderStatus === 'confirmed' && "Your order has been confirmed and will be prepared soon."}
-                  {orderStatus === 'preparing' && "Our chefs are preparing your delicious meal."}
-                  {orderStatus === 'ready' && "Your order is ready! It's on the way to you."}
+                  {orderStatus === 'preparing' && "Our chefs are preparing your meal."}
+                  {orderStatus === 'ready' && "Your order is ready! It's on its way to you."}
                   {orderStatus === 'delivered' && "Your order has been delivered. Enjoy your meal!"}
                 </p>
               </CardContent>
@@ -114,7 +231,7 @@ const Orders = () => {
           {/* Cart Items */}
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>Your Cart ({state.items.length} items)</CardTitle>
+              <CardTitle>Cart ({state.items.length} items)</CardTitle>
             </CardHeader>
             <CardContent>
               {state.items.length === 0 ? (
