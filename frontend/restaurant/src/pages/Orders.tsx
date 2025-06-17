@@ -7,40 +7,65 @@ import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
 import { toast } from '@/hooks/use-toast';
 import axios from 'axios';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Orders = () => {
   const { state, updateQuantity, removeItem, clearCart, setCart } = useCart();
   const [orderStatus, setOrderStatus] = useState<string>('pending');
   const [orderId, setOrderId] = useState<string | null>(null);
-
-  // Assume userId and token are stored in localStorage after login
-  const userId = localStorage.getItem('userId') || 'user123';
+  const [userId, setUserId] = useState<string | null>(localStorage.getItem('userId') || null);
   const token = localStorage.getItem('token') || '';
 
-  // API base URL
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api/orders';
-
-  // Fetch pending orders on page load
+  // Fetch user ID from user service
   useEffect(() => {
-    const fetchPendingOrders = async () => {
+    const fetchUserProfile = async () => {
       try {
-        const response = await axios.get(`${API_URL}/user/${userId}`, {
+        const response = await axios.get(API_ENDPOINTS.USER.PROFILE, {
           headers: { Authorization: `Bearer ${token}` }
         });
+        const user = response.data;
+        localStorage.setItem('userId', user.id);
+        setUserId(user.id);
+      } catch (error) {
+        toast({
+          title: 'Error',
+          description: 'Unable to fetch user profile. Please log in again.',
+          variant: 'destructive'
+        });
+      }
+    };
+
+    if (token && !userId) {
+      fetchUserProfile();
+    }
+  }, [token, userId]);
+
+  // Fetch pending orders
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchPendingOrders = async () => {
+      try {
+        const response = await axios.get(API_ENDPOINTS.ORDER.USER(userId), {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.data.success) {
+          throw new Error(response.data.error);
+        }
         const orders = response.data.data.filter(order => order.status === 'pending');
         
-        // Map orders to CartItem format
         const cartItems = await Promise.all(
           orders.map(async (order) => {
-            // Fetch menu item details from menu service
-            const menuResponse = await axios.get(
-              `${import.meta.env.VITE_MENU_SERVICE_URL || 'http://localhost:3001'}/api/menu/${order.menu_item_id}`,
-              { headers: { Authorization: `Bearer ${token}` } }
-            );
+            const menuResponse = await axios.get(API_ENDPOINTS.MENU.ITEM(order.menu_item_id), {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (!menuResponse.data.success) {
+              throw new Error(menuResponse.data.error);
+            }
             const menuItem = menuResponse.data.data;
             return {
-              id: order.id, // Order ID
-              menu_item_id: order.menu_item_id, // Menu item ID
+              id: order.id,
+              menu_item_id: order.menu_item_id,
               name: menuItem.name,
               price: menuItem.price,
               image: menuItem.image,
@@ -53,7 +78,7 @@ const Orders = () => {
       } catch (error) {
         toast({
           title: 'Error',
-          description: 'Unable to load orders. Please try again.',
+          description: error.message || 'Unable to load orders. Please try again.',
           variant: 'destructive'
         });
       }
@@ -62,15 +87,18 @@ const Orders = () => {
     fetchPendingOrders();
   }, [setCart, userId, token]);
 
-  // Track order status after placing an order
+  // Track order status
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (orderId) {
       interval = setInterval(async () => {
         try {
-          const response = await axios.get(`${API_URL}/${orderId}`, {
+          const response = await axios.get(API_ENDPOINTS.ORDER.ITEM(orderId), {
             headers: { Authorization: `Bearer ${token}` }
           });
+          if (!response.data.success) {
+            throw new Error(response.data.error);
+          }
           const status = response.data.data.status;
           setOrderStatus(status);
           if (status === 'delivered') {
@@ -79,7 +107,7 @@ const Orders = () => {
         } catch (error) {
           toast({
             title: 'Error',
-            description: 'Unable to update order status.',
+            description: error.message || 'Unable to update order status.',
             variant: 'destructive'
           });
         }
@@ -89,30 +117,14 @@ const Orders = () => {
   }, [orderId, token]);
 
   const handleQuantityChange = async (id: string, newQuantity: number) => {
-    if (newQuantity <= 0) {
-      removeItem(id);
-    } else {
-      try {
-        const item = state.items.find(item => item.id === id);
-        if (!item) return;
-
-        const response = await axios.patch(
-          `${API_URL}/${id}`,
-          {
-            quantity: newQuantity,
-            total_price: item.price * newQuantity
-          },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-
-        updateQuantity(id, newQuantity);
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Unable to update quantity.',
-          variant: 'destructive'
-        });
-      }
+    try {
+      await updateQuantity(id, newQuantity);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Unable to update quantity.',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -127,13 +139,12 @@ const Orders = () => {
     }
 
     try {
-      // Create an order for each item
       const orderPromises = state.items.map(item =>
         axios.post(
-          API_URL,
+          API_ENDPOINTS.ORDER.BASE,
           {
             user_id: userId,
-            menu_item_id: item.id,
+            menu_item_id: item.menu_item_id,
             quantity: item.quantity,
             total_price: item.price * item.quantity
           },
@@ -142,7 +153,7 @@ const Orders = () => {
       );
 
       const responses = await Promise.all(orderPromises);
-      const newOrderId = responses[0].data.data.id; // Take the first order ID to track status
+      const newOrderId = responses[0].data.data.id;
       setOrderId(newOrderId);
 
       toast({
@@ -154,7 +165,7 @@ const Orders = () => {
     } catch (error) {
       toast({
         title: 'Error',
-        description: 'Unable to place order. Please try again.',
+        description: error.response?.data?.message || 'Unable to place order. Please try again.',
         variant: 'destructive'
       });
     }
@@ -190,7 +201,6 @@ const Orders = () => {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-8">Your Orders</h1>
           
-          {/* Order Status */}
           {state.items.length > 0 && (
             <Card className="mb-8">
               <CardHeader>
@@ -228,7 +238,6 @@ const Orders = () => {
             </Card>
           )}
 
-          {/* Cart Items */}
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>Cart ({state.items.length} items)</CardTitle>
@@ -291,7 +300,6 @@ const Orders = () => {
             </CardContent>
           </Card>
 
-          {/* Order Summary & Checkout */}
           {state.items.length > 0 && (
             <Card>
               <CardHeader>
@@ -323,7 +331,7 @@ const Orders = () => {
                   <Button
                     onClick={handleCheckout}
                     className="flex-1 bg-orange-500 hover:bg-orange-600 text-white py-3"
-                    disabled={orderStatus !== 'pending'}
+                    disabled={orderStatus !== 'pending' || !userId}
                   >
                     {orderStatus === 'pending' ? 'Place Order' : 'Order Placed'}
                   </Button>
@@ -331,7 +339,7 @@ const Orders = () => {
                     variant="outline"
                     onClick={clearCart}
                     className="px-6"
-                    disabled={orderStatus !== 'pending'}
+                    disabled={orderStatus !== 'pending' || !userId}
                   >
                     Clear Cart
                   </Button>

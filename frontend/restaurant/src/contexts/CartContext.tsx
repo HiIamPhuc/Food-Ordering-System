@@ -43,7 +43,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
           item.id === action.payload.id
             ? { ...item, quantity: action.payload.quantity }
             : item
-        ),
+        ).filter(item => item.quantity > 0),
         total: state.items.reduce(
           (sum, item) =>
             sum + (item.id === action.payload.id
@@ -58,7 +58,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         items: state.items.filter((item) => item.id !== action.payload.id),
         total: state.items.reduce(
           (sum, item) =>
-            sum + (item.id === action.payload.id ? 0 : item.price * item.quantity),
+            sum + (item.id !== action.payload.id ? item.price * item.quantity : 0),
           0
         ),
       };
@@ -75,7 +75,7 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 interface CartContextType {
   state: CartState;
   addItem: (item: Omit<CartItem, 'quantity' | 'id'>) => Promise<void>;
-  updateQuantity: (id: string, quantity: number) => void;
+  updateQuantity: (id: string, quantity: number) => Promise<void>;
   removeItem: (id: string) => Promise<void>;
   clearCart: () => Promise<void>;
   setCart: (items: CartItem[]) => void;
@@ -89,45 +89,84 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const addItem = async (item: Omit<CartItem, 'quantity' | 'id'>) => {
     try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        throw new Error('User not logged in');
+      }
       const response = await axios.post(
         API_ENDPOINTS.ORDER.BASE,
         {
-          user_id: localStorage.getItem('userId') || 'user123',
+          user_id: userId,
           menu_item_id: item.menu_item_id,
           quantity: 1,
           total_price: item.price
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      if (!response.data.success) {
+        throw new Error(response.data.error);
+      }
       dispatch({ 
         type: 'ADD_ITEM', 
         payload: { item, orderId: response.data.data.id }
       });
     } catch (error) {
-      throw new Error('Unable to add item to cart');
+      throw new Error(error.response?.data?.message || 'Unable to add item to cart');
     }
   };
 
-  const updateQuantity = (id: string, quantity: number) => {
-    dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } });
+  const updateQuantity = async (id: string, quantity: number) => {
+    try {
+      if (quantity <= 0) {
+        return removeItem(id);
+      }
+      const item = state.items.find(item => item.id === id);
+      if (!item) {
+        throw new Error('Item not found');
+      }
+      const response = await axios.patch(
+        API_ENDPOINTS.ORDER.ITEM(id),
+        {
+          quantity,
+          total_price: item.price * quantity
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!response.data.success) {
+        throw new Error(response.data.error);
+      }
+      dispatch({ type: 'UPDATE_QUANTITY', payload: { id, quantity } });
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Unable to update quantity');
+    }
   };
 
   const removeItem = async (id: string) => {
     try {
-      await axios.delete(API_ENDPOINTS.ORDER.ITEM(id), {
+      const response = await axios.delete(API_ENDPOINTS.ORDER.ITEM(id), {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (!response.data.success) {
+        throw new Error(response.data.error);
+      }
       dispatch({ type: 'REMOVE_ITEM', payload: { id } });
     } catch (error) {
-      throw new Error('Unable to remove item from cart');
+      throw new Error(error.response?.data?.message || 'Unable to remove item from cart');
     }
   };
 
   const clearCart = async () => {
     try {
-      const response = await axios.get(API_ENDPOINTS.ORDER.USER(localStorage.getItem('userId') || 'user123'), {
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        throw new Error('User not logged in');
+      }
+      const response = await axios.get(API_ENDPOINTS.ORDER.USER(userId), {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (!response.data.success) {
+        throw new Error(response.data.error);
+      }
       const orders = response.data.data.filter(order => order.status === 'pending');
       await Promise.all(
         orders.map(order => 
@@ -138,7 +177,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
       );
       dispatch({ type: 'CLEAR_CART' });
     } catch (error) {
-      throw new Error('Unable to clear cart');
+      throw new Error(error.response?.data?.message || 'Unable to clear cart');
     }
   };
 

@@ -19,13 +19,12 @@ const corsOptions = {
       'http://127.0.0.1:8080'        
     ];
 
-    
     // Add environment-specific origins
     if (process.env.ALLOWED_ORIGINS) {
       allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(','));
     }
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

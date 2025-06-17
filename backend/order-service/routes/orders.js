@@ -43,7 +43,7 @@ router.get('/', auth, orderController.getAllOrders);
 router.get('/user/:userId', auth, orderController.getOrdersByUser);
 router.get('/:id', auth, orderController.getOrderById);
 router.patch('/:id/status', auth, statusValidation, orderController.updateOrderStatus);
-router.patch('/:id', auth, quantityValidation, orderController.updateOrderQuantity); // Thêm mới
+router.patch('/:id', auth, quantityValidation, orderController.updateOrderQuantity); 
 router.delete('/:id', auth, orderController.deleteOrder);
 
 // Admin routes for order management

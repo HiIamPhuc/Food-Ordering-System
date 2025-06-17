@@ -1,57 +1,58 @@
-const jwt = require('jsonwebtoken');
+const axios = require('axios');
 
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
       return res.status(401).json({
+        success: false,
         error: 'Access denied',
         message: 'No token provided'
       });
     }
 
-    // For development, we'll use a simple JWT verification
-    // In production, this should verify against the User service
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
-    
-    req.user = decoded;
+    // Gọi user service để xác minh token
+    const response = await axios.get(`${process.env.USER_SERVICE_URL || 'http://localhost:8000'}/api/users/profile/`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    // Lưu thông tin user vào req.user
+    req.user = response.data; // { id, name, email, username, created_at }
     next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
+    if (error.response?.status === 401) {
       return res.status(401).json({
-        error: 'Token expired',
+        success: false,
+        error: 'Invalid token',
         message: 'Please login again'
       });
     }
     
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        error: 'Invalid token',
-        message: 'Token is malformed'
-      });
-    }
-    
+    console.error('Auth error:', error.message);
     res.status(401).json({
+      success: false,
       error: 'Authentication failed',
       message: 'Invalid token'
     });
   }
 };
 
-// Middleware for optional authentication
-const optionalAuth = (req, res, next) => {
+// Middleware cho xác thực tùy chọn
+const optionalAuth = async (req, res, next) => {
   try {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret-key');
-      req.user = decoded;
+      const response = await axios.get(`${process.env.USER_SERVICE_URL || 'http://localhost:8000'}/api/users/profile/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      req.user = response.data;
     }
     
     next();
   } catch (error) {
-    // Continue without authentication if token is invalid
+    // Tiếp tục nếu token không hợp lệ
     next();
   }
 };

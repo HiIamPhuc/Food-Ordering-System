@@ -57,7 +57,7 @@ const orderSchema = new mongoose.Schema({
   collection: 'orders'
 });
 
-// Index for better query performance
+// Indexes for better query performance
 orderSchema.index({ user_id: 1 });
 orderSchema.index({ menu_item_id: 1 });
 orderSchema.index({ status: 1 });
@@ -83,7 +83,7 @@ orderSchema.statics.findByUser = function(userId) {
 
 // Static method to find orders by status
 orderSchema.statics.findByStatus = function(status) {
-  return this.find({ status: status }).sort({ created_at: -1 });
+  return this.find({ status }).sort({ created_at: -1 });
 };
 
 // Static method to get order statistics

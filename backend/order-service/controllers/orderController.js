@@ -25,8 +25,16 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // Verify menu item exists and is available
-    const menuItem = await verifyMenuItem(req.body.menu_item_id);
+    const { user_id, menu_item_id, quantity, total_price } = req.body;
+    if (user_id !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'User ID does not match authenticated user'
+      });
+    }
+
+    const menuItem = await verifyMenuItem(menu_item_id);
     if (!menuItem) {
       return res.status(400).json({
         success: false,
@@ -34,18 +42,17 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // Calculate expected total price
-    const expectedTotal = menuItem.price * req.body.quantity;
-    if (Math.abs(expectedTotal - req.body.total_price) > 0.01) {
+    const expectedTotal = menuItem.price * quantity;
+    if (Math.abs(expectedTotal - total_price) > 0.01) {
       return res.status(400).json({
         success: false,
         error: 'Total price mismatch',
         expected: expectedTotal,
-        received: req.body.total_price
+        received: total_price
       });
     }
 
-    const order = new Order(req.body);
+    const order = new Order({ user_id, menu_item_id, quantity, total_price });
     await order.save();
 
     res.status(201).json({
@@ -101,6 +108,14 @@ const getAllOrders = async (req, res) => {
 const getOrdersByUser = async (req, res) => {
   try {
     const userId = req.params.userId;
+    if (userId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'User ID does not match authenticated user'
+      });
+    }
+
     const orders = await Order.findByUser(userId);
 
     res.status(200).json({
@@ -123,10 +138,10 @@ const getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     
-    if (!order) {
+    if (!order || order.user_id !== req.user.id) {
       return res.status(404).json({
         success: false,
-        error: 'Order not found'
+        error: 'Order not found or unauthorized'
       });
     }
 
@@ -180,17 +195,76 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+// Update order quantity
+const updateOrderQuantity = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.array()
+      });
+    }
+
+    const order = await Order.findById(req.params.id);
+    
+    if (!order || order.user_id !== req.user.id) {
+      return res.status(404).json({
+        success: false,
+        error: 'Order not found or unauthorized'
+      });
+    }
+
+    const menuItem = await verifyMenuItem(order.menu_item_id);
+    if (!menuItem) {
+      return res.status(400).json({
+        success: false,
+        error: 'Menu item not found or unavailable'
+      });
+    }
+
+    const expectedTotal = menuItem.price * req.body.quantity;
+    if (Math.abs(expectedTotal - req.body.total_price) > 0.01) {
+      return res.status(400).json({
+        success: false,
+        error: 'Total price mismatch',
+        expected: expectedTotal,
+        received: req.body.total_price
+      });
+    }
+
+    order.quantity = req.body.quantity;
+    order.total_price = req.body.total_price;
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Order quantity updated successfully',
+      data: order
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update order quantity',
+      message: error.message
+    });
+  }
+};
+
 // Delete order
 const deleteOrder = async (req, res) => {
   try {
-    const order = await Order.findByIdAndDelete(req.params.id);
+    const order = await Order.findById(req.params.id);
     
-    if (!order) {
+    if (!order || order.user_id !== req.user.id) {
       return res.status(404).json({
         success: false,
-        error: 'Order not found'
+        error: 'Order not found or unauthorized'
       });
     }
+
+    await order.deleteOne();
 
     res.status(200).json({
       success: true,
@@ -215,7 +289,7 @@ const getOrdersByStatus = async (req, res) => {
       success: true,
       data: orders,
       count: orders.length,
-      status: status
+      status
     });
   } catch (error) {
     res.status(500).json({
@@ -246,9 +320,17 @@ const bulkUpdateOrderStatus = async (req, res) => {
       });
     }
 
+    const orders = await Order.find({ _id: { $in: order_ids }, user_id: req.user.id });
+    if (orders.length !== order_ids.length) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized or some orders not found'
+      });
+    }
+
     const result = await Order.updateMany(
       { _id: { $in: order_ids } },
-      { status: status, updated_at: new Date() }
+      { status, updated_at: new Date() }
     );
 
     res.status(200).json({
@@ -287,7 +369,14 @@ const getOrderStats = async (req, res) => {
 const getUserOrderStats = async (req, res) => {
   try {
     const userId = req.params.userId;
-    
+    if (userId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'Unauthorized',
+        message: 'User ID does not match authenticated user'
+      });
+    }
+
     const userStats = await Order.aggregate([
       { $match: { user_id: userId } },
       {
@@ -328,76 +417,16 @@ const getUserOrderStats = async (req, res) => {
   }
 };
 
-// Update order quantity
-const updateOrderQuantity = async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors.array()
-      });
-    }
-
-    const order = await Order.findById(req.params.id);
-    
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        error: 'Order not found'
-      });
-    }
-
-    // Xác minh món ăn
-    const menuItem = await verifyMenuItem(order.menu_item_id);
-    if (!menuItem) {
-      return res.status(400).json({
-        success: false,
-        error: 'Menu item not found or unavailable'
-      });
-    }
-
-    // Kiểm tra tổng giá
-    const expectedTotal = menuItem.price * req.body.quantity;
-    if (Math.abs(expectedTotal - req.body.total_price) > 0.01) {
-      return res.status(400).json({
-        success: false,
-        error: 'Total price mismatch',
-        expected: expectedTotal,
-        received: req.body.total_price
-      });
-    }
-
-    order.quantity = req.body.quantity;
-    order.total_price = req.body.total_price;
-    order.updated_at = new Date();
-    await order.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Order quantity updated successfully',
-      data: order
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update order quantity',
-      message: error.message
-    });
-  }
-};
-
 module.exports = {
   createOrder,
   getAllOrders,
   getOrdersByUser,
   getOrderById,
   updateOrderStatus,
+  updateOrderQuantity,
   deleteOrder,
   getOrdersByStatus,
   bulkUpdateOrderStatus,
   getOrderStats,
-  getUserOrderStats,
-  updateOrderQuantity
+  getUserOrderStats
 };
