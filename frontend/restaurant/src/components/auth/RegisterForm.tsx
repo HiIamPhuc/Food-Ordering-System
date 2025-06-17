@@ -1,46 +1,89 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { parseApiErrors } from '@/utils/api';
 
 interface RegisterFormProps {
   onToggleMode: (mode: 'login' | 'register' | 'change-password') => void;
+  onClose: () => void;
 }
 
-const RegisterForm = ({ onToggleMode }: RegisterFormProps) => {
+const RegisterForm = ({ onToggleMode, onClose }: RegisterFormProps) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    username: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setIsLoading(true);
+
     if (formData.password !== formData.confirmPassword) {
       toast({
-        title: "Error",
-        description: "Passwords do not match.",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Passwords do not match.',
+        variant: 'destructive',
       });
+      setIsLoading(false);
       return;
     }
 
-    console.log('Registration attempt:', formData);
-    toast({
-      title: "Registration successful!",
-      description: "Welcome to Restaurant! Please sign in.",
-    });
-    onToggleMode('login');
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/auth/register/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          username: formData.username,
+          password: formData.password,
+          password_confirm: formData.confirmPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(parseApiErrors(data, {
+          name: 'Name',
+          email: 'Email',
+          username: 'Username',
+          password: 'Password',
+          password_confirm: 'Confirm Password',
+        }));
+      }
+
+      login(data.user, data.tokens);
+      toast({
+        title: 'Registration successful!',
+        description: 'Welcome to Restaurant! You are now signed in.',
+      });
+      onClose(); // Or close the modal
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Registration failed.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -71,6 +114,17 @@ const RegisterForm = ({ onToggleMode }: RegisterFormProps) => {
                 required
               />
             </div>
+          </div>
+
+          <div>
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              value={formData.username}
+              onChange={(e) => handleInputChange('username', e.target.value)}
+              placeholder="Enter your username"
+              required
+            />
           </div>
 
           <div>
@@ -109,11 +163,12 @@ const RegisterForm = ({ onToggleMode }: RegisterFormProps) => {
             />
           </div>
 
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full bg-orange-500 hover:bg-orange-600"
+            disabled={isLoading}
           >
-            Create Account
+            {isLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
 
           <div className="text-center">

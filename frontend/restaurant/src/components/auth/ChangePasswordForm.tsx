@@ -1,45 +1,82 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { parseApiErrors } from '@/utils/api';
 
 interface ChangePasswordFormProps {
   onToggleMode: (mode: 'login' | 'register' | 'change-password') => void;
+  onClose: () => void;
 }
 
-const ChangePasswordForm = ({ onToggleMode }: ChangePasswordFormProps) => {
+const ChangePasswordForm = ({ onToggleMode, onClose }: ChangePasswordFormProps) => {
   const [formData, setFormData] = useState({
-    email: '',
-    currentPassword: '',
+    oldPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const { accessToken } = useAuth();
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setIsLoading(true);
+
     if (formData.newPassword !== formData.confirmPassword) {
       toast({
-        title: "Error",
-        description: "New passwords do not match.",
-        variant: "destructive"
+        title: 'Error',
+        description: 'New passwords do not match.',
+        variant: 'destructive',
       });
+      setIsLoading(false);
       return;
     }
 
-    console.log('Password change attempt:', formData);
-    toast({
-      title: "Password changed!",
-      description: "Your password has been updated successfully.",
-    });
-    onToggleMode('login');
+    try {
+      const response = await fetch('http://127.0.0.1:8000/api/auth/change-password/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          old_password: formData.oldPassword,
+          new_password: formData.newPassword,
+          new_password_confirm: formData.confirmPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(parseApiErrors(data, {
+          old_password: 'Current Password',
+          new_password: 'New Password',
+          new_password_confirm: 'Confirm Password',
+        }));
+      }
+
+      toast({
+        title: 'Password changed!',
+        description: 'Your password has been updated successfully.',
+      });
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to change password.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -50,24 +87,12 @@ const ChangePasswordForm = ({ onToggleMode }: ChangePasswordFormProps) => {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="oldPassword">Current Password</Label>
             <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              placeholder="Enter your email"
-              required
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="currentPassword">Current Password</Label>
-            <Input
-              id="currentPassword"
+              id="oldPassword"
               type="password"
-              value={formData.currentPassword}
-              onChange={(e) => handleInputChange('currentPassword', e.target.value)}
+              value={formData.oldPassword}
+              onChange={(e) => handleInputChange('oldPassword', e.target.value)}
               placeholder="Enter current password"
               required
             />
@@ -97,11 +122,12 @@ const ChangePasswordForm = ({ onToggleMode }: ChangePasswordFormProps) => {
             />
           </div>
 
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full bg-orange-500 hover:bg-orange-600"
+            disabled={isLoading}
           >
-            Change Password
+            {isLoading ? 'Changing Password...' : 'Change Password'}
           </Button>
 
           <div className="text-center">

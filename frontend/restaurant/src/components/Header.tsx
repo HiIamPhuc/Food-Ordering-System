@@ -1,22 +1,24 @@
-
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
 import AuthModal from './auth/AuthModal';
 
 const Header = () => {
   const location = useLocation();
   const { state } = useCart();
+  const { user, accessToken, logout, refreshAccessToken } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [authModal, setAuthModal] = useState<{ isOpen: boolean; mode: 'login' | 'register' | 'change-password' }>({
+  const [authModal, setAuthModal] = useState<{
+    isOpen: boolean;
+    mode: 'login' | 'register' | 'change-password';
+  }>({
     isOpen: false,
-    mode: 'login'
+    mode: 'login',
   });
-  
-  // Mock authentication state - replace with real auth logic later
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -28,17 +30,61 @@ const Header = () => {
     setAuthModal({ isOpen: false, mode: 'login' });
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    console.log('User logged out');
-  };
+  const handleLogout = useCallback(async () => {
+    try {
+      let currentAccessToken = accessToken;
+      const refreshToken = localStorage.getItem('refreshToken');
+      if (!refreshToken || !currentAccessToken) {
+        throw new Error('No valid tokens available');
+      }
+
+      let response = await fetch(`http://localhost:8000/api/auth/logout/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${currentAccessToken}`,
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (response.status === 401) {
+        currentAccessToken = await refreshAccessToken();
+        response = await fetch(`http://localhost:8000/api/auth/logout/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${currentAccessToken}`,
+          },
+          body: JSON.stringify({ refresh_token: refreshToken }),
+        });
+      }
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Logout failed');
+      }
+
+      logout();
+      toast({
+        title: 'Logged out',
+        description: 'You have been logged out successfully.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to log out.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsMenuOpen(false);
+    }
+  }, [accessToken, refreshAccessToken, logout, setIsMenuOpen]);
 
   return (
     <>
       <header className="bg-white shadow-sm border-b sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
             <Link to="/" className="flex items-center space-x-2">
               <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-lg">R</span>
@@ -46,7 +92,6 @@ const Header = () => {
               <span className="text-xl font-bold text-gray-900">Restaurant</span>
             </Link>
 
-            {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
               <Link
                 to="/"
@@ -77,7 +122,7 @@ const Header = () => {
                   </Badge>
                 )}
               </Link>
-              {isAuthenticated ? (
+              {user ? (
                 <>
                   <Link
                     to="/profile"
@@ -117,7 +162,6 @@ const Header = () => {
               )}
             </nav>
 
-            {/* Mobile menu button */}
             <div className="md:hidden">
               <Button
                 variant="ghost"
@@ -126,15 +170,26 @@ const Header = () => {
                 className="p-2"
               >
                 <div className="w-6 h-6 flex flex-col justify-center items-center">
-                  <span className={`bg-gray-600 block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm ${isMenuOpen ? 'rotate-45 translate-y-1' : '-translate-y-0.5'}`}></span>
-                  <span className={`bg-gray-600 block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm my-0.5 ${isMenuOpen ? 'opacity-0' : 'opacity-100'}`}></span>
-                  <span className={`bg-gray-600 block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm ${isMenuOpen ? '-rotate-45 -translate-y-1' : 'translate-y-0.5'}`}></span>
+                  <span
+                    className={`bg-gray-600 block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm ${
+                      isMenuOpen ? 'rotate-45 translate-y-1' : '-translate-y-0.5'
+                    }`}
+                  ></span>
+                  <span
+                    className={`bg-gray-600 block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm my-0.5 ${
+                      isMenuOpen ? 'opacity-0' : 'opacity-100'
+                    }`}
+                  ></span>
+                  <span
+                    className={`bg-gray-600 block transition-all duration-300 ease-out h-0.5 w-6 rounded-sm ${
+                      isMenuOpen ? '-rotate-45 -translate-y-1' : 'translate-y-0.5'
+                    }`}
+                  ></span>
                 </div>
               </Button>
             </div>
           </div>
 
-          {/* Mobile Navigation */}
           {isMenuOpen && (
             <div className="md:hidden">
               <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t">
@@ -170,7 +225,7 @@ const Header = () => {
                     </Badge>
                   )}
                 </Link>
-                {isAuthenticated ? (
+                {user ? (
                   <>
                     <Link
                       to="/profile"
@@ -182,10 +237,7 @@ const Header = () => {
                       Profile
                     </Link>
                     <Button
-                      onClick={() => {
-                        handleLogout();
-                        setIsMenuOpen(false);
-                      }}
+                      onClick={handleLogout}
                       variant="ghost"
                       className="w-full justify-start px-3 py-2 text-base font-medium text-gray-700 hover:text-orange-600"
                     >

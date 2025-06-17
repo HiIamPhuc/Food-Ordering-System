@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import LoginForm from './LoginForm';
@@ -16,23 +15,27 @@ const AuthModal = ({ isOpen, onClose, initialMode = 'login' }: AuthModalProps) =
 
   const getTitle = () => {
     switch (mode) {
-      case 'login': return 'Sign In';
-      case 'register': return 'Create Account';
-      case 'change-password': return 'Change Password';
-      default: return 'Authentication';
+      case 'login':
+        return 'Sign In';
+      case 'register':
+        return 'Create Account';
+      case 'change-password':
+        return 'Change Password';
+      default:
+        return 'Authentication';
     }
   };
 
   const renderForm = () => {
     switch (mode) {
       case 'login':
-        return <LoginForm onToggleMode={setMode} />;
+        return <LoginForm onToggleMode={setMode} onClose={onClose} />;
       case 'register':
-        return <RegisterForm onToggleMode={setMode} />;
+        return <RegisterForm onToggleMode={setMode} onClose={onClose} />;
       case 'change-password':
-        return <ChangePasswordForm onToggleMode={setMode} />;
+        return <ChangePasswordForm onToggleMode={setMode} onClose={onClose} />;
       default:
-        return <LoginForm onToggleMode={setMode} />;
+        return <LoginForm onToggleMode={setMode} onClose={onClose} />;
     }
   };
 

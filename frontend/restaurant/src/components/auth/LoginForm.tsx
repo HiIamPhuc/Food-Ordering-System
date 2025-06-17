@@ -1,33 +1,67 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { parseApiErrors } from '@/utils/api';
 
 interface LoginFormProps {
   onToggleMode: (mode: 'login' | 'register' | 'change-password') => void;
+  onClose: () => void;
 }
 
-const LoginForm = ({ onToggleMode }: LoginFormProps) => {
+const LoginForm = ({ onToggleMode, onClose }: LoginFormProps) => {
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log('Login attempt:', formData);
-    toast({
-      title: "Login successful!",
-      description: "Welcome back to Restaurant.",
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setIsLoading(true);
+
+  try {
+    const response = await fetch(`http://127.0.0.1:8000/api/auth/login/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email: formData.email,
+        password: formData.password,
+      }),
     });
-  };
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(parseApiErrors(data, { email: 'Email', password: 'Password' }));
+    }
+
+    login(data.user, data.tokens); // Calls AuthContext login
+    toast({
+      title: 'Login successful!',
+      description: 'Welcome back to Restaurant.',
+    });
+    onClose();
+  } catch (error: any) {
+    toast({
+      title: 'Error',
+      description: error.message || 'Failed to log in.',
+      variant: 'destructive',
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -60,11 +94,12 @@ const LoginForm = ({ onToggleMode }: LoginFormProps) => {
             />
           </div>
 
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full bg-orange-500 hover:bg-orange-600"
+            disabled={isLoading}
           >
-            Sign In
+            {isLoading ? 'Signing In...' : 'Sign In'}
           </Button>
 
           <div className="text-center space-y-2">

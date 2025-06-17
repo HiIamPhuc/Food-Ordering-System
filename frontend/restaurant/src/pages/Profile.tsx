@@ -1,51 +1,146 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import AuthModal from '@/components/auth/AuthModal';
 
 const Profile = () => {
+  const { user, accessToken } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    phone: '+1 (555) 123-4567',
-    address: '123 Main Street',
-    city: 'New York',
-    zipCode: '10001',
-    preferences: 'No spicy food, extra sauce on the side'
+    name: '',
+    email: '',
+    username: '',
+    created_at: ''
   });
-
+  const [stats, setStats] = useState({
+    join_date: '',
+    total_orders: 0,
+    favorite_dish: '',
+    total_spent: 0,
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user || !accessToken) {
+      navigate('/'); // Redirect to home if not authenticated
+      return;
+    }
+
+    const fetchProfile = async () => {
+      try {
+        setIsLoading(true);
+        const profileResponse = await fetch('http://localhost:8000/api/users/profile/', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        if (!profileResponse.ok) {
+          throw new Error('Failed to fetch profile');
+        }
+        const profileData = await profileResponse.json();
+
+        const statsResponse = await fetch('http://localhost:8000/api/users/stats/', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        if (!statsResponse.ok) {
+          throw new Error('Failed to fetch stats');
+        }
+        const statsData = await statsResponse.json();
+
+        setProfile({
+          name: profileData.name || '',
+          email: profileData.email || '',
+          username: profileData.username || '',
+          created_at: profileData.created_at || ''
+        });
+        setStats({
+          join_date: statsData.join_date || '',
+          total_orders: statsData.total_orders || 0,
+          favorite_dish: statsData.favorite_dish || 'Unknown',
+          total_spent: statsData.total_spent || 0,
+        });
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to load profile.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfile();
+  }, [user, accessToken, navigate]);
 
   const handleInputChange = (field: string, value: string) => {
-    setProfile(prev => ({ ...prev, [field]: value }));
+    setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSave = () => {
-    setIsEditing(false);
-    toast({
-      title: "Profile updated!",
-      description: "Your profile information has been saved successfully.",
-    });
+  const handleSave = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/users/profile/', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          name: profile.name,
+          // Email and username are read-only in the backend
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to update profile');
+      }
+
+      setIsEditing(false);
+      toast({
+        title: 'Profile updated!',
+        description: 'Your profile information has been saved successfully.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update profile.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleCancel = () => {
     setIsEditing(false);
-    // Reset to original values if needed
+    // Reset to original values if needed (could fetch again or store initial state)
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 bg-gray-50 flex items-center justify-center">
+          <p>Loading...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
-      
       <main className="flex-1 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="mb-8">
@@ -60,122 +155,53 @@ const Profile = () => {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Personal Information</CardTitle>
                   {!isEditing ? (
-                    <Button 
-                      onClick={() => setIsEditing(true)}
-                      variant="outline"
-                    >
+                    <Button onClick={() => setIsEditing(true)} variant="outline">
                       Edit
                     </Button>
                   ) : (
                     <div className="space-x-2">
-                      <Button 
+                      <Button
                         onClick={handleSave}
                         className="bg-orange-500 hover:bg-orange-600"
                       >
                         Save
                       </Button>
-                      <Button 
-                        onClick={handleCancel}
-                        variant="outline"
-                      >
+                      <Button onClick={handleCancel} variant="outline">
                         Cancel
                       </Button>
                     </div>
                   )}
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                        id="firstName"
-                        value={profile.firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value)}
-                        disabled={!isEditing}
-                        className={!isEditing ? 'bg-gray-50' : ''}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        value={profile.lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value)}
-                        disabled={!isEditing}
-                        className={!isEditing ? 'bg-gray-50' : ''}
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="name">Full Name</Label>
+                    <Input
+                      id="name"
+                      value={profile.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      disabled={!isEditing}
+                      className={!isEditing ? 'bg-gray-50' : ''}
+                    />
                   </div>
-
                   <div>
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
                       type="email"
                       value={profile.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      disabled={!isEditing}
-                      className={!isEditing ? 'bg-gray-50' : ''}
+                      disabled
+                      className="bg-gray-50"
                     />
                   </div>
-
                   <div>
-                    <Label htmlFor="phone">Phone Number</Label>
+                    <Label htmlFor="username">Username</Label>
                     <Input
-                      id="phone"
-                      value={profile.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      disabled={!isEditing}
-                      className={!isEditing ? 'bg-gray-50' : ''}
+                      id="username"
+                      value={profile.username}
+                      disabled
+                      className="bg-gray-50"
                     />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="address">Address</Label>
-                    <Input
-                      id="address"
-                      value={profile.address}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                      disabled={!isEditing}
-                      className={!isEditing ? 'bg-gray-50' : ''}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="city">City</Label>
-                      <Input
-                        id="city"
-                        value={profile.city}
-                        onChange={(e) => handleInputChange('city', e.target.value)}
-                        disabled={!isEditing}
-                        className={!isEditing ? 'bg-gray-50' : ''}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="zipCode">ZIP Code</Label>
-                      <Input
-                        id="zipCode"
-                        value={profile.zipCode}
-                        onChange={(e) => handleInputChange('zipCode', e.target.value)}
-                        disabled={!isEditing}
-                        className={!isEditing ? 'bg-gray-50' : ''}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="preferences">Dietary Preferences & Notes</Label>
-                    <Textarea
-                      id="preferences"
-                      value={profile.preferences}
-                      onChange={(e) => handleInputChange('preferences', e.target.value)}
-                      disabled={!isEditing}
-                      className={!isEditing ? 'bg-gray-50' : ''}
-                      rows={3}
-                      placeholder="Any dietary restrictions or special requests..."
-                    />
-                  </div>
+                  </div>                
                 </CardContent>
               </Card>
             </div>
@@ -189,19 +215,19 @@ const Profile = () => {
                 <CardContent className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Member since:</span>
-                    <span className="font-medium">Jan 2024</span>
+                    <span className="font-medium">{new Date(stats.join_date).toLocaleDateString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total orders:</span>
-                    <span className="font-medium">23</span>
+                    <span className="font-medium">{stats.total_orders}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Favorite dish:</span>
-                    <span className="font-medium">Margherita Pizza</span>
+                    <span className="font-medium">{stats.favorite_dish}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total spent:</span>
-                    <span className="font-medium text-orange-600">$467.50</span>
+                    <span className="font-medium text-orange-600">${stats.total_spent.toFixed(2)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -212,25 +238,27 @@ const Profile = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <Button className="w-full bg-orange-500 hover:bg-orange-600" asChild>
-                    <a href="/menu">Order Now</a>
+                    {/* <a href="/menu">Order Now</a> */}
+                    navigate('/menu')
                   </Button>
                   <Button variant="outline" className="w-full" asChild>
-                    <a href="/orders">View Order History</a>
+                    {/* <a href="/orders">View Order History</a> */}
+                    navigate('/orders')
                   </Button>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full"
                     onClick={() => setShowPasswordModal(true)}
                   >
                     Change Password
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  {/* <Button variant="outline" className="w-full">
                     Download Receipts
-                  </Button>
+                  </Button> */}
                 </CardContent>
               </Card>
 
-              <Card>
+              {/* <Card>
                 <CardHeader>
                   <CardTitle>Loyalty Program</CardTitle>
                 </CardHeader>
@@ -244,14 +272,12 @@ const Profile = () => {
                     <div className="text-xs text-gray-500">150 points until free meal</div>
                   </div>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
           </div>
         </div>
       </main>
-      
       <Footer />
-
       <AuthModal
         isOpen={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
