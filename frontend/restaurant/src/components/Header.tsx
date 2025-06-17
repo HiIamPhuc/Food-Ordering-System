@@ -6,6 +6,7 @@ import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import AuthModal from './auth/AuthModal';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Header = () => {
   const location = useLocation();
@@ -38,7 +39,7 @@ const Header = () => {
         throw new Error('No valid tokens available');
       }
 
-      let response = await fetch(`http://localhost:8000/api/auth/logout/`, {
+      let response = await fetch(API_ENDPOINTS.AUTH.LOGOUT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,7 +50,7 @@ const Header = () => {
 
       if (response.status === 401) {
         currentAccessToken = await refreshAccessToken();
-        response = await fetch(`http://localhost:8000/api/auth/logout/`, {
+        response = await fetch(API_ENDPOINTS.AUTH.LOGOUT, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

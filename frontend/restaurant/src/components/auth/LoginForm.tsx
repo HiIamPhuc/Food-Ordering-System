@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseApiErrors } from '@/utils/api';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface LoginFormProps {
   onToggleMode: (mode: 'login' | 'register' | 'change-password') => void;
@@ -25,43 +26,44 @@ const LoginForm = ({ onToggleMode, onClose }: LoginFormProps) => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setIsLoading(true);
+    e.preventDefault();
+    setIsLoading(true);
 
-  try {
-    const response = await fetch(`http://127.0.0.1:8000/api/auth/login/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: formData.email,
-        password: formData.password,
-      }),
-    });
+    try {
+      console.log(API_ENDPOINTS.AUTH.LOGIN);
+      const response = await fetch(API_ENDPOINTS.AUTH.LOGIN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(parseApiErrors(data, { email: 'Email', password: 'Password' }));
+      if (!response.ok) {
+        throw new Error(parseApiErrors(data, { email: 'Email', password: 'Password' }));
+      }
+
+      login(data.user, data.tokens);
+      toast({
+        title: 'Login successful!',
+        description: 'Welcome back to Restaurant.',
+      });
+      onClose();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to log in.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
     }
-
-    login(data.user, data.tokens); // Calls AuthContext login
-    toast({
-      title: 'Login successful!',
-      description: 'Welcome back to Restaurant.',
-    });
-    onClose();
-  } catch (error: any) {
-    toast({
-      title: 'Error',
-      description: error.message || 'Failed to log in.',
-      variant: 'destructive',
-    });
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -111,14 +113,14 @@ const LoginForm = ({ onToggleMode, onClose }: LoginFormProps) => {
             >
               Don't have an account? Sign Up
             </Button>
-            <Button
+            {/* <Button
               type="button"
               variant="link"
               onClick={() => onToggleMode('change-password')}
               className="text-gray-600 hover:text-gray-700 block w-full"
             >
               Forgot Password?
-            </Button>
+            </Button> */}
           </div>
         </form>
       </CardContent>

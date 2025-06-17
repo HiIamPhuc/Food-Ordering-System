@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import AuthModal from '@/components/auth/AuthModal';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Profile = () => {
   const { user, accessToken } = useAuth();
@@ -31,14 +32,14 @@ const Profile = () => {
 
   useEffect(() => {
     if (!user || !accessToken) {
-      navigate('/'); // Redirect to home if not authenticated
+      navigate('/');
       return;
     }
 
     const fetchProfile = async () => {
       try {
         setIsLoading(true);
-        const profileResponse = await fetch('http://localhost:8000/api/users/profile/', {
+        const profileResponse = await fetch(API_ENDPOINTS.USER.PROFILE, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
@@ -48,7 +49,7 @@ const Profile = () => {
         }
         const profileData = await profileResponse.json();
 
-        const statsResponse = await fetch('http://localhost:8000/api/users/stats/', {
+        const statsResponse = await fetch(API_ENDPOINTS.USER.STATS, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
@@ -90,7 +91,7 @@ const Profile = () => {
 
   const handleSave = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/users/profile/', {
+      const response = await fetch(API_ENDPOINTS.USER.PROFILE, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -98,7 +99,6 @@ const Profile = () => {
         },
         body: JSON.stringify({
           name: profile.name,
-          // Email and username are read-only in the backend
         }),
       });
 

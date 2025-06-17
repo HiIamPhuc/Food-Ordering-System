@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import axios from 'axios';
+import { API_ENDPOINTS } from '@/config/api';
 
 export interface CartItem {
   id: string; // Order ID
@@ -29,55 +30,43 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
         items: action.payload,
         total: action.payload.reduce((sum, item) => sum + (item.price * item.quantity), 0)
       };
-    case 'ADD_ITEM': {
-      const existingItem = state.items.find(item => item.menu_item_id === action.payload.item.menu_item_id);
-      
-      if (existingItem) {
-        const updatedItems = state.items.map(item =>
-          item.menu_item_id === action.payload.item.menu_item_id
-            ? { ...item, quantity: item.quantity + 1 }
+    case 'ADD_ITEM':
+      return {
+        ...state,
+        items: [...state.items, { ...action.payload.item, id: action.payload.orderId, quantity: 1 }],
+        total: state.total + action.payload.item.price,
+      };
+    case 'UPDATE_QUANTITY':
+      return {
+        ...state,
+        items: state.items.map((item) =>
+          item.id === action.payload.id
+            ? { ...item, quantity: action.payload.quantity }
             : item
-        );
-        return {
-          items: updatedItems,
-          total: updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-        };
-      }
-      
-      const newItems = [
-        ...state.items,
-        { ...action.payload.item, id: action.payload.orderId, quantity: 1 }
-      ];
-      return {
-        items: newItems,
-        total: newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+        ),
+        total: state.items.reduce(
+          (sum, item) =>
+            sum + (item.id === action.payload.id
+              ? item.price * action.payload.quantity
+              : item.price * item.quantity),
+          0
+        ),
       };
-    }
-    
-    case 'UPDATE_QUANTITY': {
-      const updatedItems = state.items.map(item =>
-        item.id === action.payload.id
-          ? { ...item, quantity: Math.max(0, action.payload.quantity) }
-          : item
-      ).filter(item => item.quantity > 0);
-      
+    case 'REMOVE_ITEM':
       return {
-        items: updatedItems,
-        total: updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+        ...state,
+        items: state.items.filter((item) => item.id !== action.payload.id),
+        total: state.items.reduce(
+          (sum, item) =>
+            sum + (item.id === action.payload.id ? 0 : item.price * item.quantity),
+          0
+        ),
       };
-    }
-    
-    case 'REMOVE_ITEM': {
-      const filteredItems = state.items.filter(item => item.id !== action.payload.id);
-      return {
-        items: filteredItems,
-        total: filteredItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-      };
-    }
-    
     case 'CLEAR_CART':
-      return { items: [], total: 0 };
-    
+      return {
+        items: [],
+        total: 0,
+      };
     default:
       return state;
   }
@@ -85,10 +74,10 @@ const cartReducer = (state: CartState, action: CartAction): CartState => {
 
 interface CartContextType {
   state: CartState;
-  addItem: (item: Omit<CartItem, 'quantity' | 'id'>) => void;
+  addItem: (item: Omit<CartItem, 'quantity' | 'id'>) => Promise<void>;
   updateQuantity: (id: string, quantity: number) => void;
-  removeItem: (id: string) => void;
-  clearCart: () => void;
+  removeItem: (id: string) => Promise<void>;
+  clearCart: () => Promise<void>;
   setCart: (items: CartItem[]) => void;
 }
 
@@ -97,12 +86,11 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider = ({ children }: { children: ReactNode }) => {
   const [state, dispatch] = useReducer(cartReducer, { items: [], total: 0 });
   const token = localStorage.getItem('token') || '';
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api/orders';
 
   const addItem = async (item: Omit<CartItem, 'quantity' | 'id'>) => {
     try {
       const response = await axios.post(
-        API_URL,
+        API_ENDPOINTS.ORDER.BASE,
         {
           user_id: localStorage.getItem('userId') || 'user123',
           menu_item_id: item.menu_item_id,
@@ -126,7 +114,7 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const removeItem = async (id: string) => {
     try {
-      await axios.delete(`${API_URL}/${id}`, {
+      await axios.delete(API_ENDPOINTS.ORDER.ITEM(id), {
         headers: { Authorization: `Bearer ${token}` }
       });
       dispatch({ type: 'REMOVE_ITEM', payload: { id } });
@@ -137,13 +125,13 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
 
   const clearCart = async () => {
     try {
-      const response = await axios.get(`${API_URL}/user/${localStorage.getItem('userId') || 'user123'}`, {
+      const response = await axios.get(API_ENDPOINTS.ORDER.USER(localStorage.getItem('userId') || 'user123'), {
         headers: { Authorization: `Bearer ${token}` }
       });
       const orders = response.data.data.filter(order => order.status === 'pending');
       await Promise.all(
         orders.map(order => 
-          axios.delete(`${API_URL}/${order.id}`, {
+          axios.delete(API_ENDPOINTS.ORDER.ITEM(order.id), {
             headers: { Authorization: `Bearer ${token}` }
           })
         )

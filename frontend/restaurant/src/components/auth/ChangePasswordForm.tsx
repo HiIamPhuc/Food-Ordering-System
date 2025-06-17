@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { parseApiErrors } from '@/utils/api';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface ChangePasswordFormProps {
   onToggleMode: (mode: 'login' | 'register' | 'change-password') => void;
@@ -40,7 +41,7 @@ const ChangePasswordForm = ({ onToggleMode, onClose }: ChangePasswordFormProps) 
     }
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/auth/change-password/', {
+      const response = await fetch(API_ENDPOINTS.AUTH.CHANGE_PASSWORD, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
