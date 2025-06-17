@@ -78,7 +78,7 @@ orderSchema.methods.updateStatus = function(newStatus) {
 
 // Static method to find orders by user
 orderSchema.statics.findByUser = function(userId) {
-  return this.find({ user_id: userId }).sort({ created_at: -1 });
+  return this.find({ user_id: userId }).sort({ created_at: -1 }); 
 };
 
 // Static method to find orders by status
