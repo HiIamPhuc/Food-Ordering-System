@@ -10,12 +10,14 @@ services:
     volumes:
       - mongodb_data:/data/db
     ports:
-      - "27017:27017"
+      - "27018:27018"
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - menu-network
 
   menu-service:
     build: .
@@ -24,7 +26,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3001
-      - MONGODB_URI=mongodb://admin:password@mongodb:27017/food_ordering_menu?authSource=admin
+      - MONGODB_URI=mongodb://admin:password@mongodb:27018/food_ordering_menu?authSource=admin
       - JWT_SECRET=menu-service-jwt-secret-key
       - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
     depends_on:
@@ -34,6 +36,13 @@ services:
       - .:/app
       - /app/node_modules
     command: npm run dev
+    networks:
+      - menu-network
 
 volumes:
   mongodb_data:
+
+networks:
+  menu-network:
+    name: menu-network
+    driver: bridge
