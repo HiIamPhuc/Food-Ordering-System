@@ -1,70 +1,78 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import DishCard from '@/components/DishCard';
 import { Button } from '@/components/ui/button';
-
-// Sample menu data
-const menuItems = [
-  {
-    id: '1',
-    name: 'Margherita Pizza',
-    description: 'Fresh mozzarella, tomato sauce, and basil on a crispy crust',
-    price: 16.99,
-    image: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
-    category: 'Pizza'
-  },
-  {
-    id: '2',
-    name: 'Grilled Salmon',
-    description: 'Atlantic salmon with lemon herb butter and seasonal vegetables',
-    price: 24.99,
-    image: 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=400&h=300&fit=crop',
-    category: 'Seafood'
-  },
-  {
-    id: '3',
-    name: 'Caesar Salad',
-    description: 'Crisp romaine lettuce, parmesan cheese, croutons, and caesar dressing',
-    price: 12.99,
-    image: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?w=400&h=300&fit=crop',
-    category: 'Salads'
-  },
-  {
-    id: '4',
-    name: 'Beef Burger',
-    description: 'Angus beef patty with lettuce, tomato, cheese, and fries',
-    price: 18.99,
-    image: 'https://images.unsplash.com/photo-1535268647677-300dbf3d78d1?w=400&h=300&fit=crop',
-    category: 'Burgers'
-  },
-  {
-    id: '5',
-    name: 'Chicken Alfredo',
-    description: 'Grilled chicken breast over fettuccine with creamy alfredo sauce',
-    price: 19.99,
-    image: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
-    category: 'Pasta'
-  },
-  {
-    id: '6',
-    name: 'Fish Tacos',
-    description: 'Grilled white fish with cabbage slaw and chipotle mayo',
-    price: 15.99,
-    image: 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=400&h=300&fit=crop',
-    category: 'Mexican'
-  }
-];
+import { menuService, type MenuItem } from '@/services/menuService';
+import { useToast } from '@/components/ui/use-toast';
 
 const categories = ['All', 'Pizza', 'Seafood', 'Salads', 'Burgers', 'Pasta', 'Mexican'];
 
 const Menu = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      try {
+        setLoading(true);
+        const response = await menuService.getAvailableMenuItems();
+        if (response.success) {
+          setMenuItems(response.data);
+        } else {
+          throw new Error('Failed to fetch menu items');
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An error occurred');
+        toast({
+          title: "Error",
+          description: "Failed to load menu items. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMenuItems();
+  }, [toast]);
 
   const filteredItems = selectedCategory === 'All' 
     ? menuItems 
-    : menuItems.filter(item => item.category === selectedCategory);
+    : menuItems.filter(item => item.name.toLowerCase().includes(selectedCategory.toLowerCase()));
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading menu items...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-red-500 mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()}>Try Again</Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -111,12 +119,12 @@ const Menu = () => {
               {filteredItems.map((item) => (
                 <DishCard
                   key={item.id}
-                  id={item.id}
+                  menu_item_id={item.id}
                   name={item.name}
-                  description={item.description}
+                  description={item.name} // Using name as description since it's not in the API
                   price={item.price}
-                  image={item.image}
-                  category={item.category}
+                  image={item.image_url}
+                  category={selectedCategory}
                 />
               ))}
             </div>

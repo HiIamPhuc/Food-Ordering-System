@@ -23,4 +23,4 @@ export const API_ENDPOINTS = {
     USER: (userId: string) => `${import.meta.env.VITE_ORDER_SERVICE_URL}/api/orders/user/${userId}`,
     ITEM: (id: string) => `${import.meta.env.VITE_ORDER_SERVICE_URL}/api/orders/${id}`,
   },
-}; 
+};

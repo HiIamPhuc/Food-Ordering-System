@@ -11,7 +11,6 @@ services:
       - NODE_ENV=production
       - PORT=3002
       - MONGODB_URI=mongodb://mongodb:27017/food_ordering_orders
-      - JWT_SECRET=your_jwt_secret_here
       - USER_SERVICE_URL=http://localhost:8000
       - MENU_SERVICE_URL=http://localhost:3001
     depends_on:
