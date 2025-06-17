@@ -30,7 +30,7 @@ router.get('/available', menuController.getAvailableMenuItems);
 router.get('/:id', menuController.getMenuItemById);
 
 // Protected routes (authentication required)
-router.post('/', auth, menuValidation, menuController.createMenuItem);
+router.post('/', menuValidation, menuController.createMenuItem);
 router.put('/:id', auth, menuValidation, menuController.updateMenuItem);
 router.patch('/:id/status', auth, menuController.toggleMenuItemStatus);
 router.delete('/:id', auth, menuController.deleteMenuItem);

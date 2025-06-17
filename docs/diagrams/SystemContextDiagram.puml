@@ -1,0 +1,11 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+Person(user, "User", "A person who orders food online")
+Person(admin, "Admin", "Manages menu, orders, users")
+System(system, "Food Ordering System", "Allows users to order food online")
+
+Rel(user, system, "Browses menu, places orders, manages profile")
+Rel(admin, system, "Manages menu, orders, users")
+
+@enduml

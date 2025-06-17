@@ -1,0 +1,51 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+Person(user, "User")
+
+System_Ext(menuDb, "Menu Database", "MongoDB", "Stores menu data")
+System_Ext(orderDb, "Order Database", "MongoDB", "Stores order data")
+System_Ext(userDb, "User Database", "PostgreSQL", "Stores user data")
+
+Container_Boundary(webClient, "Web Client (React)") {
+    Component(uiComponents, "UI Components", "React Components", "Displays menu, order, user interfaces")
+    Component(frontendServices, "Frontend Services", "TypeScript", "Calls backend services for data")
+    Rel(uiComponents, frontendServices, "Uses")
+}
+
+Container_Boundary(userService, "User Service (Django)") {
+    Component(userViewsController, "User Views/Controller", "Django Views", "Handles user-related business logic")
+    Component(userSerializer, "User Serializer", "Django REST Framework", "Converts model instances to JSON")
+    Component(userModel, "User Model", "Django ORM", "Defines User entity and interacts with DB")
+    Component(userUrls, "User URLs", "Django URLs", "Defines API endpoints for users")
+    Rel(userUrls, userViewsController, "Calls")
+    Rel(userViewsController, userSerializer, "Uses")
+    Rel(userViewsController, userModel, "Uses")
+}
+
+Container_Boundary(menuService, "Menu Service (Node.js)") {
+    Component(menuController, "Menu Controller", "Express Controller", "Handles menu item business logic")
+    Component(menuModel, "Menu Model", "Mongoose Model", "Defines Menu Item schema and interacts with DB")
+    Component(menuRoutes, "Menu Routes", "Express Router", "Defines API endpoints for menu items")
+    Rel(menuRoutes, menuController, "Calls")
+    Rel(menuController, menuModel, "Uses")
+}
+
+Container_Boundary(orderService, "Order Service (Node.js)") {
+    Component(orderController, "Order Controller", "Express Controller", "Handles order business logic")
+    Component(orderModel, "Order Model", "Mongoose Model", "Defines Order schema and interacts with DB")
+    Component(orderRoutes, "Order Routes", "Express Router", "Defines API endpoints for orders")
+    Rel(orderRoutes, orderController, "Calls")
+    Rel(orderController, orderModel, "Uses")
+}
+
+Rel(user, uiComponents, "Uses", "HTTPS")
+Rel(frontendServices, userUrls, "Makes API calls", "HTTPS/JSON")
+Rel(frontendServices, menuRoutes, "Makes API calls", "HTTPS/JSON")
+Rel(frontendServices, orderRoutes, "Makes API calls", "HTTPS/JSON")
+
+Rel(userModel, userDb, "Reads/Writes", "SQL")
+Rel(menuModel, menuDb, "Reads/Writes", "MongoDB")
+Rel(orderModel, orderDb, "Reads/Writes", "MongoDB")
+
+@enduml

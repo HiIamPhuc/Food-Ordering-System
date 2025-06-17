@@ -1,0 +1,43 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+Person(user, "User")
+
+Node(userDevice, "User Device") {
+    Container(webClient, "Web Client", "React", "Frontend application running in user's browser")
+}
+
+Node(menuServiceServer, "Menu Service Server") {
+    Container(menuService, "Menu Service", "Node.js", "Manages menu items and categories")
+}
+
+Node(orderServiceServer, "Order Service Server") {
+    Container(orderService, "Order Service", "Node.js", "Handles order creation, updates, and status")
+}
+
+Node(userServiceServer, "User Service Server") {
+    Container(userService, "User Service", "Django", "Manages user accounts, authentication, and profiles")
+}
+
+Node(menuDbServer, "Database Server (MongoDB for Menu)") {
+    ContainerDb(menuDb, "Menu Database", "MongoDB", "Stores menu item data")
+}
+
+Node(orderDbServer, "Database Server (MongoDB for Orders)") {
+    ContainerDb(orderDb, "Order Database", "MongoDB", "Stores order and order item data")
+}
+
+Node(userDbServer, "Database Server (PostgreSQL for Users)") {
+    ContainerDb(userDb, "User Database", "PostgreSQL", "Stores user account and profile data")
+}
+
+Rel(user, webClient, "Uses", "HTTPS")
+Rel(webClient, menuService, "API calls", "HTTPS/JSON")
+Rel(webClient, orderService, "API calls", "HTTPS/JSON")
+Rel(webClient, userService, "API calls", "HTTPS/JSON")
+
+Rel(menuService, menuDb, "Reads/Writes", "MongoDB")
+Rel(orderService, orderDb, "Reads/Writes", "MongoDB")
+Rel(userService, userDb, "Reads/Writes", "SQL")
+
+@enduml

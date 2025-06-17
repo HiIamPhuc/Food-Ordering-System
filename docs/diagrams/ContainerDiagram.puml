@@ -1,0 +1,23 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+Person(user, "User")
+System_Boundary(foodOrderingSystem, "Food Ordering System") {
+    Container(webClient, "Web Client", "React", "Allows users to browse menu and place orders")
+    Container(menuService, "Menu Service", "Node.js", "Manages menu items")
+    Container(orderService, "Order Service", "Node.js", "Handles orders")
+    Container(userService, "User Service", "Django", "Manages user accounts")
+    ContainerDb(menuDb, "Menu Database", "MongoDB", "Stores menu data")
+    ContainerDb(orderDb, "Order Database", "MongoDB", "Stores order data")
+    ContainerDb(userDb, "User Database", "PostgreSQL", "Stores user data")
+}
+
+Rel(user, webClient, "Uses", "HTTPS")
+Rel(webClient, menuService, "API calls", "HTTPS/JSON")
+Rel(webClient, orderService, "API calls", "HTTPS/JSON")
+Rel(webClient, userService, "API calls", "HTTPS/JSON")
+Rel(menuService, menuDb, "Reads/Writes", "MongoDB")
+Rel(orderService, orderDb, "Reads/Writes", "MongoDB")
+Rel(userService, userDb, "Reads/Writes", "SQL")
+
+@enduml
