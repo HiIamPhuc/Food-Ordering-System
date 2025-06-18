@@ -1,3 +1,5 @@
+import { API_ENDPOINTS } from '@/config/api';
+
 export const refreshAccessToken = async () => {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) {
@@ -5,7 +7,7 @@ export const refreshAccessToken = async () => {
   }
 
   try {
-    const response = await fetch('http://localhost:8000/api/auth/refresh/', {
+    const response = await fetch(API_ENDPOINTS.AUTH.REFRESH, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

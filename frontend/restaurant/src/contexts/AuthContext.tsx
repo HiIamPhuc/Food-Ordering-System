@@ -1,5 +1,6 @@
 // src/contexts/AuthContext.tsx
 import { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface AuthContextType {
   user: { id: number; name: string; email: string; username: string } | null;
@@ -49,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const refreshToken = localStorage.getItem('refreshToken');
     if (!refreshToken) throw new Error('No refresh token available');
 
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/refresh/`, {
+    const response = await fetch(API_ENDPOINTS.AUTH.REFRESH, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refresh: refreshToken }),

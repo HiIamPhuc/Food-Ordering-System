@@ -8,28 +8,6 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 3000,
-    proxy: {
-      '/api/orders': {
-        target: 'http://localhost:3002',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/auth': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/users': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        secure: false,
-      },
-      '/api/menu': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-        secure: false,
-      }
-    }
   },
   plugins: [
     react(),
