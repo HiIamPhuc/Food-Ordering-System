@@ -7,7 +7,6 @@ export interface CartItem {
   menu_item_id: string; // Menu item ID
   name: string;
   price: number;
-  image: string;
   quantity: number;
 }
 

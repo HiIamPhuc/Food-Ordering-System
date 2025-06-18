@@ -121,9 +121,7 @@ const Menu = () => {
                   key={item.id}
                   menu_item_id={item.id}
                   name={item.name}
-                  description={item.name} // Using name as description since it's not in the API
                   price={item.price}
-                  image={item.image_url}
                   category={selectedCategory}
                 />
               ))}
