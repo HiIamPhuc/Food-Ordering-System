@@ -66,7 +66,7 @@ sudo apt-get install redis-server
 
 ### 1. Clone repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/HiIamPhuc/Food-Ordering-System
 cd Food-Ordering-System
 ```
 

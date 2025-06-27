@@ -61,7 +61,7 @@ sudo systemctl enable docker
 
 ### 1. Clone repository
 ```bash
-git clone <repository-url>
+git clone https://github.com/HiIamPhuc/Food-Ordering-System
 cd Food-Ordering-System
 ```
 
@@ -682,27 +682,6 @@ docker exec -it <container_name> netstat -tulpn
 3. **Resource limits**: Can add resource limits
 4. **Secrets management**: Use Docker secrets for production
 5. **Network isolation**: Each service has separate network
-
-### Production considerations
-```yaml
-# Add to docker-compose.yml
-services:
-  app:
-    deploy:
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp
-      - /var/cache
-```
 
 ## Backup and Recovery
 
